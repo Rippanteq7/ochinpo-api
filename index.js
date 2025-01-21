@@ -123,8 +123,8 @@ const utils = {
 			).json()
 
 		let info = await makeRequest('/v2/info')
-		info = await utils.decryptSaveTube(info)
-		opts.key = info.data.key
+		info = await utils.decryptSaveTube(info.data)
+		opts.key = info.key
 		return makeRequest('/download')
 	},
 	formatSize: (n) => bytes(+n, { unitSeparator: ' ' }),
