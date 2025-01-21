@@ -13,6 +13,7 @@ import util from 'util'
 import yts from 'yt-search'
 
 const utils = {
+	corsUrl: 'https://cors.caliph.my.id/',
 	getBrowser: (...opts) =>
 		playwright.chromium.launch({
 			args: [
@@ -81,7 +82,7 @@ const utils = {
 		const makeRequest = async (endpoint) =>
 			(
 				await fetch(
-					`https://api.mp3youtube.cc/v2/${endpoint}`,
+					`${utils.corsUrl}https://api.mp3youtube.cc/v2${endpoint}`,
 					Object.assign(
 						{ headers },
 						(endpoint !== 'converter' ? {} : {
@@ -92,10 +93,10 @@ const utils = {
 				)
 			).text()
 		
-		const data = await makeRequest('sanity/key')
+		const data = await makeRequest('/sanity/key')
 		console.log(data)
 		headers.key = JSON.parse(data).key
-		const conv = await makeRequest('converter')
+		const conv = await makeRequest('/converter')
 		console.log(conv)
 		return JSON.parse(conv)
 	},
@@ -464,13 +465,15 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 
 			const isAudio = obj.type !== 'video'
 			const payload = {
-				url: obj.url,
-				downloadType: isAudio ? 'audio' : 'video',
-				quality: obj.quality ? String(obj.quality) : isAudio ? '128' : '720'
+				link: obj.url,
+				format: isAudio ? 'mp3' : 'mp4',
+				audioBitrate: isAudio ? obj.quality || 256 : 256,
+				videoQuality: isAudio ? 360 : obj.quality || 360,
+				vCodec: 'h264'
 			}
 
 			const result = await utils.fetchSaveTubeAPI(payload)
-			if (!result.data?.downloadUrl) {
+			if (!result.url) {
 				console.log(result)
 				const msg = result?.errorMsg || 'An error occured'
 				res
@@ -479,7 +482,7 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 				return
             }
 
-			res.redirect(result.data.downloadUrl)
+			res.redirect(result.url)
 			return
 		}
 
