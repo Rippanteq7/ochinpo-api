@@ -90,11 +90,14 @@ const utils = {
 						})
 					)
 				)
-			).json()
+			).text()
 		
 		const data = await makeRequest('sanity/key')
-		headers.key = data.key
-		return makeRequest('converter')
+		console.log(data)
+		headers.key = JSON.parse(data).key
+		const conv = await makeRequest('converter')
+		console.log(conv)
+		return JSON.parse(conv)
 	},
 	fetchPOST: (url, body, opts = {}) =>
 		fetch(url, { method: 'POST', body, ...opts }),
