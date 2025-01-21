@@ -106,7 +106,7 @@ const utils = {
 			Authority: 'cdn59.savetube.su',
 			'Content-Type': 'application/json',
 			Origin: 'https://savetube.su',
-			Referer: headers.Origin + '/',
+			Referer: 'https://savetube.su/',
 			'User-Agent': 'WhatsApp/1.2.3'
 		}
 
