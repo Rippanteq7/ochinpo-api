@@ -472,7 +472,7 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 				vCodec: 'h264'
 			}
 
-			const result = await utils.fetchSaveTubeAPI(payload)
+			const result = await utils.fetchMp3Youtube(payload)
 			if (!result.url) {
 				console.log(result)
 				const msg = result?.errorMsg || 'An error occured'
