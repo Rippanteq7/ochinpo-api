@@ -104,7 +104,10 @@ const utils = {
 	fetchSaveTubeAPI: async (opts = {}) => {
 		const headers = {
 			Authority: 'cdn59.savetube.su',
-			'Content-Type': 'application/json'
+			'Content-Type': 'application/json',
+			/*Origin: 'https://savetube.su',
+			Referer: headers.Origin + '/',
+			'User-Agent': 'WhatsApp/1.2.3'*/
 		}
 
 		const makeRequest = async (endpoint) =>
@@ -114,11 +117,12 @@ const utils = {
 					JSON.stringify(opts),
 					{ headers }
 				)
-			).json()
+			).text()
 
 		let info = await makeRequest('/info')
-		opts.key = info.data.key
-		return makeRequest('/download')
+		console.log(info)
+		opts.key = JSON.parse(info).data.key
+		return JSON.parse(await makeRequest('/download'))
 	},
 	formatSize: (n) => bytes(+n, { unitSeparator: ' ' }),
 	generateBrat: async (text) => {
@@ -460,24 +464,22 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 
 			const isAudio = obj.type !== 'video'
 			const payload = {
-				link: obj.url,
-				format: isAudio ? 'mp3' : 'mp4',
-				audioBitrate: isAudio ? obj.quality || 256 : 256,
-				videoQuality: isAudio ? 360 : obj.quality || 360,
-				vCodec: 'h264'
+				url: obj.url,
+				downloadType: isAudio ? 'audio' : 'video',
+				quality: obj.quality ? String(obj.quality) : isAudio ? '128' : '720'
 			}
 
-			const result = await utils.fetchMp3Youtube(payload)
-			if (!result.url) {
+			const result = await utils.fetchSaveTubeAPI(payload)
+			if (!result.data?.downloadUrl) {
 				console.log(result)
-				const msg = result.errorMsg || 'An error occured'
+				const msg = result?.errorMsg || 'An error occured'
 				res
 					.status(400)
 					.json({ success: false, message: msg })
 				return
             }
 
-			res.redirect(result.url)
+			res.redirect(result.data.downloadUrl)
 			return
 		}
 
