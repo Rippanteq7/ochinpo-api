@@ -13,7 +13,39 @@ import util from 'util'
 import yts from 'yt-search'
 
 const utils = {
-	corsUrl: 'https://cors.caliph.my.id/',
+	decryptSaveTube: async (data) => {
+		const key = 'C5D58EF67A7584E4A29F6C35BBC4EB12'
+		
+		const toByteArray = (str) => {
+			if (str === key) return new Uint8Array(
+				str
+					.match(/[\dA-F]{2}/gi)
+					.map(v => parseInt(v, 16))
+			)
+			let n = atob(str.replace(/\s/g, ''))
+			let a = new Uint8Array(n.length)
+			for (let e = 0; e < n.length; e++) a[e] = n.charCodeAt(e)
+			return a.buffer
+		}
+		
+		const importKey = () => crypto.subtle.importKey(
+			'raw',
+			toByteArray(key),
+			{ name: 'AES-CBC' },
+			false,
+			['decrypt']
+		)
+		
+		const t = toByteArray(data),
+			iv = t.slice(0, 16),
+			s = await crypto.subtle.decrypt(
+				{ name: 'AES-CBC', iv },
+				await importKey(),
+				t.slice(16)
+			),
+			l = new TextDecoder().decode(new Uint8Array(s))
+		return JSON.parse(l)
+	},
 	getBrowser: (...opts) =>
 		playwright.chromium.launch({
 			args: [
@@ -73,42 +105,12 @@ const utils = {
 		let json = await resp.json()
 		return json.response
 	},
-	fetchMp3Youtube: async (opts) => {
-		const headers = {
-			'Content-Type': 'application/x-www-form-urlencoded',
-			Origin: 'https://conv.mp3youtube.cc'
-		}
-		
-		const makeRequest = async (endpoint) =>
-			(
-				await fetch(
-					`${utils.corsUrl}https://api.mp3youtube.cc/v2${endpoint}`,
-					Object.assign(
-						{ headers },
-						(endpoint !== 'converter' ? {} : {
-							method: 'POST',
-							body: new URLSearchParams(opts).toString()
-						})
-					)
-				)
-			).text()
-		
-		const data = await makeRequest('/sanity/key')
-		console.log(data)
-		headers.key = JSON.parse(data).key
-		const conv = await makeRequest('/converter')
-		console.log(conv)
-		return JSON.parse(conv)
-	},
 	fetchPOST: (url, body, opts = {}) =>
 		fetch(url, { method: 'POST', body, ...opts }),
-	fetchSaveTubeAPI: async (opts = {}) => {
+	fetchSaveTubeAPI: async (opts) => {
 		const headers = {
 			Authority: 'cdn59.savetube.su',
 			'Content-Type': 'application/json',
-			Origin: 'https://savetube.su',
-			Referer: 'https://savetube.su/',
-			'User-Agent': 'WhatsApp/1.2.3'
 		}
 
 		const makeRequest = async (endpoint) =>
@@ -118,12 +120,12 @@ const utils = {
 					JSON.stringify(opts),
 					{ headers }
 				)
-			).text()
+			).json()
 
-		let info = await makeRequest('/info')
-		console.log(info)
-		opts.key = JSON.parse(info).data.key
-		return JSON.parse(await makeRequest('/download'))
+		let info = await makeRequest('/v2/info')
+		info = await utils.decryptSaveTube(info)
+		opts.key = info.data.key
+		return makeRequest('/download')
 	},
 	formatSize: (n) => bytes(+n, { unitSeparator: ' ' }),
 	generateBrat: async (text) => {
@@ -465,24 +467,22 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 
 			const isAudio = obj.type !== 'video'
 			const payload = {
-				link: obj.url,
-				format: isAudio ? 'mp3' : 'mp4',
-				audioBitrate: isAudio ? obj.quality || 256 : 256,
-				videoQuality: isAudio ? 360 : obj.quality || 360,
-				vCodec: 'h264'
+				downloadType: isAudio ? 'audio' : 'video',
+				quality: obj.quality ? String(obj.quality) : isAudio ? '128' : '720',
+				url: obj.url
 			}
 
-			const result = await utils.fetchMp3Youtube(payload)
-			if (!result.url) {
+			const result = await utils.fetchSaveTubeAPI(payload)
+			if (!result.data?.downloadUrl) {
 				console.log(result)
-				const msg = result?.errorMsg || 'An error occured'
+				const msg = result?.message || 'An error occured'
 				res
 					.status(400)
 					.json({ success: false, message: msg })
 				return
-            }
+			}
 
-			res.redirect(result.url)
+			res.redirect(result.data?.downloadUrl)
 			return
 		}
 
