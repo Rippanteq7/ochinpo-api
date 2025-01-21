@@ -105,9 +105,9 @@ const utils = {
 		const headers = {
 			Authority: 'cdn59.savetube.su',
 			'Content-Type': 'application/json',
-			/*Origin: 'https://savetube.su',
+			Origin: 'https://savetube.su',
 			Referer: headers.Origin + '/',
-			'User-Agent': 'WhatsApp/1.2.3'*/
+			'User-Agent': 'WhatsApp/1.2.3'
 		}
 
 		const makeRequest = async (endpoint) =>
