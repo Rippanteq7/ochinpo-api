@@ -22,8 +22,8 @@ const utils = {
 					.match(/[\dA-F]{2}/gi)
 					.map(v => parseInt(v, 16))
 			)
-			let n = atob(str.replace(/\s/g, ''))
-			let a = new Uint8Array(n.length)
+			let n = atob(str.replace(/\s/g, '')),
+				a = new Uint8Array(n.length)
 			for (let e = 0; e < n.length; e++) a[e] = n.charCodeAt(e)
 			return a.buffer
 		}
@@ -120,12 +120,16 @@ const utils = {
 					JSON.stringify(opts),
 					{ headers }
 				)
-			).json()
+			).text()
 
 		let info = await makeRequest('/v2/info')
+		console.log(info)
+		info = JSON.parse(info)
 		info = await utils.decryptSaveTube(info.data)
 		opts.key = info.key
-		return makeRequest('/download')
+		let dl = await makeRequest('/download')
+		console.log(dl)
+		return JSON.parse(dl)
 	},
 	formatSize: (n) => bytes(+n, { unitSeparator: ' ' }),
 	generateBrat: async (text) => {
