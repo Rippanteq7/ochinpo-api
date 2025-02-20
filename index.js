@@ -110,7 +110,7 @@ const utils = {
 				.map(byte => byte.toString(16).padStart(2, '0'))
 				.join('')
 		)
-		
+		console.log(opts)
 		const apiUrl = `https://api5.apiapi.lat/`
 		const initUrl = `${apiUrl + randHash()}/init` +
 			`/${encString(opts.url, '1')}/${randHash()}/`
@@ -495,8 +495,8 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 			const isAudio = obj.type !== 'video'
 			const payload = {
 				format: isAudio ? '0' : '1',
-				mp3Quality: String(obj.quality) || '128',
-				mp4Quality: String(obj.quality) || '720',
+				mp3Quality: obj.quality ? String(obj.quality) : '128',
+				mp4Quality: obj.quality ? String(obj.quality) : '720',
 				url: obj.url
 			}
 
