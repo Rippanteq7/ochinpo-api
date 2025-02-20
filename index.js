@@ -22,8 +22,8 @@ const utils = {
 					.match(/[\dA-F]{2}/gi)
 					.map(v => parseInt(v, 16))
 			)
-			let n = atob(str.replace(/\s/g, '')),
-				a = new Uint8Array(n.length)
+			let n = atob(str.replace(/\s/g, ''))
+			let a = new Uint8Array(n.length)
 			for (let e = 0; e < n.length; e++) a[e] = n.charCodeAt(e)
 			return a.buffer
 		}
@@ -46,6 +46,7 @@ const utils = {
 			l = new TextDecoder().decode(new Uint8Array(s))
 		return JSON.parse(l)
 	},
+	delay: (ms) => new Promise(res => setTimeout(res, ms)),
 	getBrowser: (...opts) =>
 		playwright.chromium.launch({
 			args: [
@@ -82,21 +83,6 @@ const utils = {
 		await fs.promises.writeFile(output, Buffer.from(img))
 		return output
 	},
-	/*
-	fetchCobaltAPI: async (url, opts = {}) =>
-		(
-			await utils.fetchPOST(
-				'https://capi.3kh0.net',
-				JSON.stringify({ url, ...opts }),
-				{
-					headers: {
-						Accept: 'application/json',
-						'Content-Type': 'application/json'
-					}
-				}
-			)
-		).json(),
-	*/
 	fetchMediafireAPI: async (id) => {
 		// TODO: folder download
 		let resp = await fetch(
@@ -107,6 +93,47 @@ const utils = {
 	},
 	fetchPOST: (url, body, opts = {}) =>
 		fetch(url, { method: 'POST', body, ...opts }),
+	fetchOgMp3API: async (opts) => {
+		const encString = (str, type) => (
+			type === '1' ?
+			str.split('')
+				.reverse()
+				.map(char => char.charCodeAt(0))
+				.join(',') :
+			str.split('')
+				.map((_, i) => String.fromCharCode(str.charCodeAt(i) ^ 1))
+				.join('')
+		)
+		
+		const randHash = () => (
+			[...crypto.getRandomValues(new Uint8Array(16))]
+				.map(byte => byte.toString(16).padStart(2, '0'))
+				.join('')
+		)
+		
+		const apiUrl = `https://api5.apiapi.lat/`
+		const initUrl = `${apiUrl + randHash()}/init` +
+			`/${encString(opts.url, '1')}/${randHash()}/`
+		
+		opts.data = encString(opts.url)
+		let json, retryCount = 0
+		do {
+			if (retryCount >= 20) throw 'Max retryCount has reached.'
+			const response = await utils.fetchPOST(
+				initUrl,
+				JSON.stringify(opts),
+				{ headers }
+			)
+			json = await response.json()
+			retryCount += 1
+			console.log(json)
+			if (json.t === null) return json.t
+			await utils.delay(3e3)
+		} while (json.s === 'P')
+		
+		return `${apiUrl + randHash()}/download` +
+			`/${encString(json.i)}/${randHash()}/`
+	},
 	fetchSaveTubeAPI: async (opts) => {
 		const headers = {
 			Authority: 'cdn59.savetube.su',
@@ -120,16 +147,12 @@ const utils = {
 					JSON.stringify(opts),
 					{ headers }
 				)
-			).text()
+			).json()
 
 		let info = await makeRequest('/v2/info')
-		console.log(info)
-		info = JSON.parse(info)
 		info = await utils.decryptSaveTube(info.data)
 		opts.key = info.key
-		let dl = await makeRequest('/download')
-		console.log(dl)
-		return JSON.parse(dl)
+		return makeRequest('/download')
 	},
 	formatSize: (n) => bytes(+n, { unitSeparator: ' ' }),
 	generateBrat: async (text) => {
@@ -471,12 +494,13 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 
 			const isAudio = obj.type !== 'video'
 			const payload = {
-				downloadType: isAudio ? 'audio' : 'video',
-				quality: obj.quality ? String(obj.quality) : isAudio ? '128' : '720',
+				format: isAudio ? '0' : '1',
+				mp3Quality: String(obj.quality) || '128',
+				mp4Quality: String(obj.quality) || '720',
 				url: obj.url
 			}
 
-			const result = await utils.fetchSaveTubeAPI(payload)
+			const result = await utils.fetchOgMp3API(payload)
 			if (!result.data?.downloadUrl) {
 				console.log(result)
 				const msg = result?.message || 'An error occured'
