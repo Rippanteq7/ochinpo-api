@@ -114,7 +114,7 @@ const utils = {
 		const apiUrl = `https://api5.apiapi.lat/`
 		const initUrl = `${apiUrl + randHash()}/init` +
 			`/${encString(opts.url, '1')}/${randHash()}/`
-		
+		const headers = { 'Content-Type': 'application/json' }
 		opts.data = encString(opts.url)
 		let json, retryCount = 0
 		do {
@@ -501,7 +501,7 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 			}
 
 			const result = await utils.fetchOgMp3API(payload)
-			if (!result.data?.downloadUrl) {
+			if (!result) {
 				console.log(result)
 				const msg = result?.message || 'An error occured'
 				res
@@ -509,8 +509,11 @@ app.all(/^\/y(outube|t)(\/(d(ownload|l)|search)?)?/, async (req, res) => {
 					.json({ success: false, message: msg })
 				return
 			}
-
-			res.redirect(result.data?.downloadUrl)
+			
+			const type = (await fetch(result)).headers.get('content-type')
+			if (/text/i.test(type)) return res.status(400).json({ success: false, message: 'Can\'t download' })
+			
+			res.redirect(result)
 			return
 		}
 
